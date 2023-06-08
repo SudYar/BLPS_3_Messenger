@@ -1,13 +1,21 @@
 package sudyar.blps.service;
 
 import bitronix.tm.BitronixTransactionManager;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.jms.Queue;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jms.annotation.JmsListener;
+import org.springframework.jms.core.JmsTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import sudyar.blps.controller.MessageController;
 import sudyar.blps.dto.request.MessageRequest;
 import sudyar.blps.dto.response.MessageResponse;
 import sudyar.blps.entity.Message;
+import sudyar.blps.etc.Note;
 import sudyar.blps.repo.MessageRepository;
 
 import javax.transaction.SystemException;
@@ -16,14 +24,23 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+
 @Service
 @RequiredArgsConstructor
 public class MessageService {
+    final private long DIFF_MINUTE = 20000L;
+
 
     private final BitronixTransactionManager bitronixTransactionManager;
 
     @Autowired
     private MessageRepository messageRepository;
+    @Autowired
+    private JmsTemplate jmsTemplate;
+
+    @Autowired
+    private Queue queue;
+
 
     public MessageResponse readMessages(String login, Long DIFF_DATE){
         final var res = messageRepository.findByToOrderByCreatedDate(login);
@@ -43,10 +60,13 @@ public class MessageService {
         return new MessageResponse(res);
     }
 
-    public void deleteOverdueMessages(String login, Integer DIFF_DATE){
+    @Scheduled(fixedRate = DIFF_MINUTE)
+    public void deleteOverdueMessages(){
         Long ldtNow = new Date().getTime();
-        Long ldt = ldtNow - DIFF_DATE;
-        List<Message> messages = messageRepository.findByToAndCreatedDateIsLessThan(login, new Timestamp(ldt));
+        Long ldt = ldtNow - DIFF_MINUTE;
+        List<Message> messages = messageRepository.findByIsReadAndCreatedDateIsLessThan(true, new Timestamp(ldt));
+        System.out.println(new Timestamp(ldt));
+        System.out.println(messages);
         messageRepository.deleteAll(messages);
     }
 
@@ -107,6 +127,28 @@ public class MessageService {
                 e.printStackTrace();
             }
         }
+
+    }
+
+
+
+    @JmsListener(destination = "netsurfingzone-queue")
+    public void consumeMessage(String jsonMessage) {
+        Note note = null;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+//            logger.info(jsonMessage);
+            note = mapper.readValue(jsonMessage, Note.class);
+            Message mes = new Message();
+            mes.setTo(note.getTo());
+            mes.setFrom(note.getFrom());
+            mes.setMessage(note.getMessage());
+            mes.setIsRead(false);
+            messageRepository.save(mes);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+
 
     }
 }

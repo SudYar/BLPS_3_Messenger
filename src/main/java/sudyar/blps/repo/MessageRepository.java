@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface MessageRepository extends JpaRepository<Message, Integer> {
     List<Message> findByToOrderByCreatedDate(String toUser);
-    List<Message> findByToAndCreatedDateIsLessThan(String toUser, Timestamp createdDate);
+    List<Message> findByIsReadAndCreatedDateIsLessThan(boolean isRead, Timestamp createdDate);
     List<Message> findByFrom(String fromUser);
 
 }

@@ -16,7 +16,7 @@ public class MessageController {
 
     final private Integer DIFF_TIME = 1000000;
     final private Long DIFF_DATE = 2592000000L; // 30 дней
-    final private Long DIFF_MINUTE = 60000L;
+    final private Long DIFF_MINUTE = 120000L;
 
     @Autowired
     private UserService userService;
